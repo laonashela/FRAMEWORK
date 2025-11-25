@@ -13,13 +13,14 @@ MonoBehaviour:
   m_Name: MiniGameConfig
   m_EditorClassIdentifier: 
   ProjectConf:
-    projectName: SDK
+    projectName: FRAMEWORK
     Appid: wx1c8382e8ea35f4d1
     CDN: 
     assetLoadType: 1
     compressDataPackage: 0
     VideoUrl: 
-    DST: D:/UnityProjects/SDK/build
+    relativeDST: D:/UnityProjects/FRAMEWORK/build
+    DST: D:/UnityProjects/FRAMEWORK/build
     StreamCDN: 
     bundleHashLength: 32
     bundlePathIdentifier: StreamingAssets;
@@ -45,6 +46,7 @@ MonoBehaviour:
     UseCompressedTexture: 0
     UseMiniGameChat: 0
     PreloadWXFont: 0
+    disableMultiTouch: 0
   CompileOptions:
     DevelopBuild: 0
     AutoProfile: 0
@@ -53,7 +55,7 @@ MonoBehaviour:
     profilingFuncs: 0
     Webgl2: 0
     fbslim: 0
-    DeleteStreamingAssets: 0
+    DeleteStreamingAssets: 1
     ProfilingMemory: 0
     CleanBuild: 0
     CustomNodePath: 
@@ -64,6 +66,8 @@ MonoBehaviour:
     enablePerfAnalysis: 0
     iOSAutoGCInterval: 10000
     enableIOSPerformancePlus: 0
+    enableiOSMetal: 0
+    enableEmscriptenGLX: 0
     brotliMT: 0
     enableWasm2023: 0
   CompressTexture:

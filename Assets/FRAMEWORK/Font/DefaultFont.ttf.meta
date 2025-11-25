@@ -1,0 +1,21 @@
+fileFormatVersion: 2
+guid: CHwesSKkAC5JnQmkcyP8+XiMGCrWIl+DHXMoLaeOdFjWtf926Vv2S7Y=
+TrueTypeFontImporter:
+  externalObjects: {}
+  serializedVersion: 4
+  fontSize: 16
+  forceTextureCase: -2
+  characterSpacing: 0
+  characterPadding: 1
+  includeFontData: 1
+  fontNames:
+  - Alibaba Health Font 2.0 CN 85 B
+  fallbackFontReferences: []
+  customCharacters: 
+  fontRenderingMode: 0
+  ascentCalculationMode: 1
+  useLegacyBoundsCalculation: 0
+  shouldRoundAdvanceValue: 1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

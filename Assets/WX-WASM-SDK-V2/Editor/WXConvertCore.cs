@@ -33,8 +33,10 @@ namespace WeChatWASM
             PlayerSettings.WeixinMiniGame.compressionFormat = WeixinMiniGameCompressionFormat.Disabled;
             if(UnityUtil.GetEngineVersion() == UnityUtil.EngineVersion.Tuanjie)
             {
-                var absolutePath = Path.GetFullPath("Packages/com.qq.weixin.minigame/WebGLTemplates/WXTemplate2022TJ");
-                PlayerSettings.WeixinMiniGame.template = $"PATH:{absolutePath}";
+                //var absolutePath = Path.GetFullPath("Packages/com.qq.weixin.minigame/WebGLTemplates/WXTemplate2022TJ");
+                //PlayerSettings.WeixinMiniGame.template = $"PATH:{absolutePath}";
+
+                PlayerSettings.WeixinMiniGame.template = $"{templateHeader}WXTemplate2022TJ";
             }
             else
             {
@@ -71,7 +73,9 @@ namespace WeChatWASM
             BUILD_WEBGL_FAILED = 2,
         }
 
-        public static WXEditorScriptObject config => UnityUtil.GetEditorConf();
+        public static WXEditorScriptObject config => isPlayableBuild ? WXPlayableConvertCore.GetFakeScriptObject() : UnityUtil.GetEditorConf();
+
+        public static string defaultTemplateDir => isPlayableBuild ? "playable-default" : "wechat-default";
         public static string webglDir = "webgl"; // 导出的webgl目录
         public static string miniGameDir = "minigame"; // 生成小游戏的目录
         public static string audioDir = "Assets"; // 音频资源目录
@@ -80,6 +84,10 @@ namespace WeChatWASM
         public static string codeMd5 = string.Empty;
         public static string dataMd5 = string.Empty;
         public static string defaultImgSrc = "Assets/WX-WASM-SDK-V2/Runtime/wechat-default/images/background.jpg";
+        /// <summary>
+        /// 是否在构建试玩，构建开始前修改值，构建结束后恢复值
+        /// </summary>
+        public static bool isPlayableBuild = false;
 
         private static bool lastBrotliType = false;
         public static bool UseIL2CPP
@@ -93,37 +101,87 @@ namespace WeChatWASM
 #endif
             }
         }
-        // 可以调用这个来集成
-        public static WXExportError DoExport(bool buildWebGL = true)
+        // 是否使用 iOS Metal 渲染
+        public static bool UseiOSMetal
         {
-            LifeCycleEvent.Init();
-            Emit(LifeCycle.beforeExport);
-            if (!CheckSDK())
+            get
             {
-                Debug.LogError("若游戏曾使用旧版本微信SDK，需删除 Assets/WX-WASM-SDK 文件夹后再导入最新工具包。");
-                return WXExportError.BUILD_WEBGL_FAILED;
+                return config.CompileOptions.enableiOSMetal;
             }
-            if (!CheckBuildTemplate())
+        }
+        // 用于replaceRules判断是否需要注入相关的修改
+        public static bool UseEmscriptenGLX
+        {
+            get
             {
-                Debug.LogError("因构建模板检查失败终止导出。");
-                return WXExportError.BUILD_WEBGL_FAILED;
+                return config.CompileOptions.enableEmscriptenGLX;
             }
-            if (CheckInvalidPerfIntegration())
-            {
-                Debug.LogError("性能分析工具只能用于Development Build, 终止导出! ");
-                return WXExportError.BUILD_WEBGL_FAILED;
-            }
-
-
+        }
+        // public static void SetPlayableEnabled(bool enabled)
+        // {
+        //     isPlayableBuild = enabled;
+        // }
+        /// <summary>
+        /// 导出前的初始配置
+        /// 小游戏模式和试玩模式都会使用这个函数，如果要在这个函数加新方法，建议都以不兼容试玩模式看待
+        /// </summary>
+        public static void PreInit()
+        {
             CheckBuildTarget();
             Init();
-            ProcessWxPerfBinaries();
+            // 可能有顺序要求？如果没要求，可挪到此函数外
+            if (!isPlayableBuild)
+            {
+                ProcessWxPerfBinaries();
+            }
+            // iOS metal 的相关特性
+            ProcessWxiOSMetalBinaries();
+            // emscriptenglx的相关特性
+            ProcessWxEmscriptenGLXBinaries();
             MakeEnvForLuaAdaptor();
             // JSLib
             SettingWXTextureMinJSLib();
             UpdateGraphicAPI();
             EditorUtility.SetDirty(config);
             AssetDatabase.SaveAssets();
+        }
+        public static WXExportError PreCheck()
+        {
+            if (!CheckSDK())
+            {
+                Debug.LogError("若游戏曾使用旧版本微信SDK，需删除 Assets/WX-WASM-SDK 文件夹后再导入最新工具包。");
+                return WXExportError.BUILD_WEBGL_FAILED;
+            }
+            if (!isPlayableBuild && !CheckBuildTemplate())
+            {
+                Debug.LogError("因构建模板检查失败终止导出。");
+                return WXExportError.BUILD_WEBGL_FAILED;
+            }
+            if (!isPlayableBuild && CheckInvalidPerfIntegration())
+            {
+                Debug.LogError("性能分析工具只能用于Development Build, 终止导出!");
+                return WXExportError.BUILD_WEBGL_FAILED;
+            }
+            dynamic config = isPlayableBuild ? UnityUtil.GetPlayableEditorConf() : UnityUtil.GetEditorConf();
+            if (config.ProjectConf.relativeDST == string.Empty)
+            {
+                Debug.LogError("请先配置游戏导出路径");
+                return WXExportError.BUILD_WEBGL_FAILED;
+            }
+            return WXExportError.SUCCEED;
+        }
+        // 可以调用这个来集成
+        public static WXExportError DoExport(bool buildWebGL = true)
+        {
+            LifeCycleEvent.Init();
+            Emit(LifeCycle.beforeExport);
+            var preCheckResult = PreCheck();
+            if (preCheckResult != WXExportError.SUCCEED)
+            {
+                return preCheckResult;
+            }
+
+            PreInit();
 
             // 记录上次导出的brotliType
             {
@@ -141,12 +199,6 @@ namespace WeChatWASM
                 }
             }
 
-            if (config.ProjectConf.DST == string.Empty)
-            {
-                Debug.LogError("请先配置游戏导出路径");
-                return WXExportError.BUILD_WEBGL_FAILED;
-            }
-            else
             {
                 // 仅删除StreamingAssets目录
                 if (config.CompileOptions.DeleteStreamingAssets)
@@ -171,6 +223,9 @@ namespace WeChatWASM
                     {
                         var rootPath = Directory.GetParent(Application.dataPath).FullName;
                         string webglDir = WXExtEnvDef.GETDEF("WEIXINMINIGAME") ? "WeixinMiniGame" : "WebGL";
+#if PLATFORM_PLAYABLEADS
+                        webglDir = "PlayableAds";
+#endif
                         symFile1 = Path.Combine(rootPath, "Library", "Bee", "artifacts", webglDir, "build", "debug_WebGL_wasm", "build.js.symbols");
                     }
                     WeChatWASM.UnityUtil.preprocessSymbols(symFile1, GetWebGLSymbolPath());
@@ -232,8 +287,8 @@ namespace WeChatWASM
             }
             catch (Exception ex)
             {
-                UnityEngine.Debug.LogError($"Failed to get enabled flag string index: {ex.Message}");
-                throw;
+                UnityEngine.Debug.LogWarning($"Failed to get enabled flag string index: {ex.Message}");
+                return -1; // -1 means failed
             }
         }
 
@@ -262,7 +317,8 @@ namespace WeChatWASM
             }
             catch (Exception ex)
             {
-                UnityEngine.Debug.LogError($"Failed to enable plugin asset: {ex.Message}");
+                // 避免 Error 日志阻塞打包流程
+                UnityEngine.Debug.LogWarning($"Failed to enable plugin asset: {ex.Message}");
             }
         }
 
@@ -295,7 +351,9 @@ namespace WeChatWASM
             {
                 // WxPerfJsBridge.jslib
                 var wxPerfJSBridgeImporter = AssetImporter.GetAtPath(wxPerfPlugins[0]) as PluginImporter;
-#if PLATFORM_WEIXINMINIGAME
+#if PLATFORM_PLAYABLEADS
+				wxPerfJSBridgeImporter.SetCompatibleWithPlatform(BuildTarget.PlayableAds, config.CompileOptions.enablePerfAnalysis);
+#elif PLATFORM_WEIXINMINIGAME
                 wxPerfJSBridgeImporter.SetCompatibleWithPlatform(BuildTarget.WeixinMiniGame, config.CompileOptions.enablePerfAnalysis);
 #else
                 wxPerfJSBridgeImporter.SetCompatibleWithPlatform(BuildTarget.WebGL, config.CompileOptions.enablePerfAnalysis);
@@ -308,7 +366,10 @@ namespace WeChatWASM
                 bool bShouldEnablePerf2022Plugin = config.CompileOptions.enablePerfAnalysis && IsCompatibleWithUnity202203OrNewer();
 
                 var wxPerf2022Importer = AssetImporter.GetAtPath(wxPerfPlugins[1]) as PluginImporter;
-#if PLATFORM_WEIXINMINIGAME
+
+#if PLATFORM_PLAYABLEADS
+				wxPerf2022Importer.SetCompatibleWithPlatform(BuildTarget.PlayableAds, bShouldEnablePerf2022Plugin);
+#elif PLATFORM_WEIXINMINIGAME
                 wxPerf2022Importer.SetCompatibleWithPlatform(BuildTarget.WeixinMiniGame, bShouldEnablePerf2022Plugin);
 #else
                 wxPerf2022Importer.SetCompatibleWithPlatform(BuildTarget.WebGL, bShouldEnablePerf2022Plugin);
@@ -321,13 +382,68 @@ namespace WeChatWASM
                 bool bShouldEnablePerf2021Plugin = config.CompileOptions.enablePerfAnalysis && IsCompatibleWithUnity202102To202203();
 
                 var wxPerf2021Importer = AssetImporter.GetAtPath(wxPerfPlugins[2]) as PluginImporter;
-#if PLATFORM_WEIXINMINIGAME
+#if PLATFORM_PLAYABLEADS
+                wxPerf2021Importer.SetCompatibleWithPlatform(BuildTarget.PlayableAds, bShouldEnablePerf2021Plugin);
+#elif PLATFORM_WEIXINMINIGAME
                 wxPerf2021Importer.SetCompatibleWithPlatform(BuildTarget.WeixinMiniGame, bShouldEnablePerf2021Plugin);
 #else
                 wxPerf2021Importer.SetCompatibleWithPlatform(BuildTarget.WebGL, bShouldEnablePerf2021Plugin);
 #endif
                 SetPluginCompatibilityByModifyingMetadataFile(wxPerfPlugins[2], bShouldEnablePerf2021Plugin);
             }
+            AssetDatabase.Refresh();
+        }
+
+        private static void ProcessWxEmscriptenGLXBinaries()
+        {
+            string[] glLibs;
+            string DS = WXAssetsTextTools.DS;
+            if (UnityUtil.GetSDKMode() == UnityUtil.SDKMode.Package)
+            {
+                glLibs = new string[]
+                {
+                $"Packages{DS}com.qq.weixin.minigame{DS}Runtime{DS}Plugins{DS}libemscriptenglx.a",
+                $"Packages{DS}com.qq.weixin.minigame{DS}Runtime{DS}Plugins{DS}libemscriptenglx_2021.a",
+                };
+            }
+            else
+            {
+                string glLibRootDir = $"Assets{DS}WX-WASM-SDK-V2{DS}Runtime{DS}Plugins{DS}";
+
+                // 下方顺序不要变动
+                glLibs = new string[]
+                {
+                    $"{glLibRootDir}libemscriptenglx.a",
+                    $"{glLibRootDir}libemscriptenglx_2021.a",
+                };
+            }
+
+            {
+                // unity2022, tuanjie lib引入
+                bool showEnableGLX2022Plugin = config.CompileOptions.enableEmscriptenGLX && IsCompatibleWithUnity202203OrNewer();
+
+                var glx2022Importer = AssetImporter.GetAtPath(glLibs[0]) as PluginImporter;
+                #if PLATFORM_WEIXINMINIGAME
+                    glx2022Importer.SetCompatibleWithPlatform(BuildTarget.WeixinMiniGame, showEnableGLX2022Plugin);
+                #else
+                    glx2022Importer.SetCompatibleWithPlatform(BuildTarget.WebGL, showEnableGLX2022Plugin);
+                #endif
+                SetPluginCompatibilityByModifyingMetadataFile(glLibs[0], showEnableGLX2022Plugin);
+            }
+            
+            {
+                // unity2021 lib引入
+                bool showEnableGLX2021Plugin = config.CompileOptions.enableEmscriptenGLX && IsCompatibleWithUnity202102To202203();
+
+                var glx2021Importer = AssetImporter.GetAtPath(glLibs[1]) as PluginImporter;
+                #if PLATFORM_WEIXINMINIGAME
+                    glx2021Importer.SetCompatibleWithPlatform(BuildTarget.WeixinMiniGame, showEnableGLX2021Plugin);
+                #else
+                    glx2021Importer.SetCompatibleWithPlatform(BuildTarget.WebGL, showEnableGLX2021Plugin);
+                #endif
+                SetPluginCompatibilityByModifyingMetadataFile(glLibs[1], showEnableGLX2021Plugin);
+            }
+
             AssetDatabase.Refresh();
         }
 
@@ -369,6 +485,41 @@ namespace WeChatWASM
             }
 
             return true;
+        }
+
+        private static void ProcessWxiOSMetalBinaries()
+        {
+            string[] glLibs;
+            string DS = WXAssetsTextTools.DS;
+            if (UnityUtil.GetSDKMode() == UnityUtil.SDKMode.Package)
+            {
+                glLibs = new string[]
+                {
+                $"Packages{DS}com.qq.weixin.minigame{DS}Editor{DS}BuildProfile{DS}lib{DS}libwx-metal-cpp.bc",
+                $"Packages{DS}com.qq.weixin.minigame{DS}Editor{DS}BuildProfile{DS}lib{DS}mtl_library.jslib",
+                };
+            }
+            else
+            {
+                string glLibRootDir = $"Assets{DS}WX-WASM-SDK-V2{DS}Editor{DS}BuildProfile{DS}lib{DS}";
+                glLibs = new string[]
+                {
+                    $"{glLibRootDir}libwx-metal-cpp.bc",
+                    $"{glLibRootDir}mtl_library.jslib",
+                };
+            }
+            for (int i = 0; i < glLibs.Length; i++)
+            {
+                var importer = AssetImporter.GetAtPath(glLibs[i]) as PluginImporter;
+#if PLATFORM_WEIXINMINIGAME
+                    importer.SetCompatibleWithPlatform(BuildTarget.WeixinMiniGame, config.CompileOptions.enableiOSMetal);
+#else
+                importer.SetCompatibleWithPlatform(BuildTarget.WebGL, config.CompileOptions.enableiOSMetal);
+#endif
+                // importer.SaveAndReimport();
+                SetPluginCompatibilityByModifyingMetadataFile(glLibs[i], config.CompileOptions.enableiOSMetal);
+            }
+            AssetDatabase.Refresh();
         }
 
         private static string GetLuaAdaptorPath(string filename)
@@ -433,7 +584,9 @@ namespace WeChatWASM
                     Debug.LogError("Lua Adaptor Importer Not Found: " + maybeBuildFile);
                     continue;
                 }
-#if PLATFORM_WEIXINMINIGAME
+#if PLATFORM_PLAYABLEADS
+                wxPerfJSBridgeImporter.SetCompatibleWithPlatform(BuildTarget.PlayableAds, shouldBuild);
+#elif PLATFORM_WEIXINMINIGAME
                 wxPerfJSBridgeImporter.SetCompatibleWithPlatform(BuildTarget.WeixinMiniGame, shouldBuild);
 #else
                 wxPerfJSBridgeImporter.SetCompatibleWithPlatform(BuildTarget.WebGL, shouldBuild);
@@ -483,7 +636,12 @@ namespace WeChatWASM
             else
             {
 #if TUANJIE_2022_3_OR_NEWER
-                EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.WeixinMiniGame, BuildTarget.WeixinMiniGame);
+                if(EditorUserBuildSettings.activeBuildTarget != BuildTarget.WeixinMiniGame 
+#if PLATFORM_PLAYABLEADS
+                    && EditorUserBuildSettings.activeBuildTarget != BuildTarget.PlayableAds
+#endif
+                    )
+                    EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.WeixinMiniGame, BuildTarget.WeixinMiniGame);
 #endif
             }
             Emit(LifeCycle.afterSwitchActiveBuildTarget);
@@ -494,13 +652,28 @@ namespace WeChatWASM
             GraphicsDeviceType[] targets = new GraphicsDeviceType[] { };
 #if PLATFORM_WEIXINMINIGAME
             PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.WeixinMiniGame, false);
-            if (config.CompileOptions.Webgl2)
+            // 启用 iOS Metal 渲染
+            if (UseiOSMetal)
             {
-                PlayerSettings.SetGraphicsAPIs(BuildTarget.WeixinMiniGame, new GraphicsDeviceType[] { GraphicsDeviceType.OpenGLES3 });
+                if (config.CompileOptions.Webgl2)
+                {
+                    PlayerSettings.SetGraphicsAPIs(BuildTarget.WeixinMiniGame, new GraphicsDeviceType[] { GraphicsDeviceType.Metal, GraphicsDeviceType.OpenGLES3 });
+                }
+                else
+                {
+                    PlayerSettings.SetGraphicsAPIs(BuildTarget.WeixinMiniGame, new GraphicsDeviceType[] { GraphicsDeviceType.Metal, GraphicsDeviceType.OpenGLES2 });
+                }
             }
-            else
+            else 
             {
-                PlayerSettings.SetGraphicsAPIs(BuildTarget.WeixinMiniGame, new GraphicsDeviceType[] { GraphicsDeviceType.OpenGLES2 });
+                if (config.CompileOptions.Webgl2)
+                {
+                    PlayerSettings.SetGraphicsAPIs(BuildTarget.WeixinMiniGame, new GraphicsDeviceType[] { GraphicsDeviceType.OpenGLES3 });
+                }
+                else
+                {
+                    PlayerSettings.SetGraphicsAPIs(BuildTarget.WeixinMiniGame, new GraphicsDeviceType[] { GraphicsDeviceType.OpenGLES2 });
+                }
             }
 #else
             PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.WebGL, false);
@@ -566,7 +739,7 @@ namespace WeChatWASM
         private static bool CheckBuildTemplate()
         {
             string[] res = BuildTemplate.CheckCustomCoverBaseConflict(
-                Path.Combine(UnityUtil.GetWxSDKRootPath(), "Runtime", "wechat-default"),
+                Path.Combine(UnityUtil.GetWxSDKRootPath(), "Runtime", defaultTemplateDir),
                 Path.Combine(Application.dataPath, "WX-WASM-SDK-V2", "Editor", "template"),
                 new string[] { @"\.(js|ts|json)$" }
                 );
@@ -790,6 +963,22 @@ namespace WeChatWASM
                 }
             }
 
+            {
+                Rule[] rules =
+                {
+                    new Rule()
+                    {
+                        old = "if (GameGlobal.unityNamespace.enableProfileStats)", 
+                        newStr = "if (GameGlobal.unityNamespace.enableProfileStats || (typeof GameGlobal.manager.getWXAppCheatMonitor === 'function' && GameGlobal.manager.getWXAppCheatMonitor().shouldForceShowPerfMonitor()))"
+                    }
+                };
+                foreach (var rule in rules)
+                {
+                    text = text.Replace(rule.old, rule.newStr);
+                }
+            }
+
+
             File.WriteAllText(targetPath, text, new UTF8Encoding(false));
 
             UnityEngine.Debug.LogFormat("[Converter]  adapt framework done! ");
@@ -801,7 +990,12 @@ namespace WeChatWASM
             PlayerSettings.WeixinMiniGame.emscriptenArgs = string.Empty;
             if (WXExtEnvDef.GETDEF("UNITY_2021_2_OR_NEWER"))
             {
-                 PlayerSettings.WeixinMiniGame.emscriptenArgs += " -s EXPORTED_FUNCTIONS=_main,_sbrk,_emscripten_stack_get_base,_emscripten_stack_get_end -s ERROR_ON_UNDEFINED_SYMBOLS=0";
+                PlayerSettings.WeixinMiniGame.emscriptenArgs += " -s EXPORTED_FUNCTIONS=_main,_sbrk,_emscripten_stack_get_base,_emscripten_stack_get_end";
+                if (config.CompileOptions.enablePerfAnalysis)
+                {
+                    PlayerSettings.WeixinMiniGame.emscriptenArgs += ",_WxPerfFrameIntervalCallback";
+                }
+                PlayerSettings.WeixinMiniGame.emscriptenArgs += " -s ERROR_ON_UNDEFINED_SYMBOLS=0";
             }
 
 #else
@@ -809,7 +1003,11 @@ namespace WeChatWASM
             if (WXExtEnvDef.GETDEF("UNITY_2021_2_OR_NEWER"))
             {
                 PlayerSettings.WebGL.emscriptenArgs += " -s EXPORTED_FUNCTIONS=_sbrk,_emscripten_stack_get_base,_emscripten_stack_get_end";
-#if UNITY_2021_2_5 || UNITY_6000_0_OR_NEWER
+                if (config.CompileOptions.enablePerfAnalysis)
+                {
+                    PlayerSettings.WebGL.emscriptenArgs += ",_WxPerfFrameIntervalCallback";
+                }
+#if UNITY_2021_2_5
                 PlayerSettings.WebGL.emscriptenArgs += ",_main";
 #endif
                 PlayerSettings.WebGL.emscriptenArgs += " -s ERROR_ON_UNDEFINED_SYMBOLS=0";
@@ -875,11 +1073,8 @@ namespace WeChatWASM
             }
 
 #if UNITY_6000_0_OR_NEWER
-            if (config.CompileOptions.enableWasm2023) {
-                PlayerSettings.WebGL.wasm2023 = true;
-            } else {
-                PlayerSettings.WebGL.wasm2023 = false;
-            }
+            // 从小游戏转换工具里无法直接开启wasm2023特性 会导致转出的webgl异常，所以强制关闭
+           	PlayerSettings.WebGL.wasm2023 = false;
 #endif   
 
 #if UNITY_2021_2_OR_NEWER
@@ -919,7 +1114,11 @@ namespace WeChatWASM
             }
 #endif
 #if TUANJIE_2022_3_OR_NEWER
-            if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.WeixinMiniGame)
+            if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.WeixinMiniGame
+#if PLATFORM_PLAYABLEADS
+                && EditorUserBuildSettings.activeBuildTarget != BuildTarget.PlayableAds
+#endif
+                )
             {
                 UnityEngine.Debug.LogFormat("[Builder] Current target is: {0}, switching to: {1}", EditorUserBuildSettings.activeBuildTarget, BuildTarget.WeixinMiniGame);
                 if (!EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.WeixinMiniGame, BuildTarget.WeixinMiniGame))
@@ -930,8 +1129,11 @@ namespace WeChatWASM
             }
 
             var projDir = Path.Combine(config.ProjectConf.DST, webglDir);
-
+#if PLATFORM_PLAYABLEADS
+            var result = BuildPipeline.BuildPlayer(GetScenePaths(), projDir, BuildTarget.PlayableAds, option);
+#else
             var result = BuildPipeline.BuildPlayer(GetScenePaths(), projDir, BuildTarget.WeixinMiniGame, option);
+#endif
             if (result.summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded)
             {
                 UnityEngine.Debug.LogFormat("[Builder] BuildPlayer failed. emscriptenArgs:{0}", PlayerSettings.WeixinMiniGame.emscriptenArgs);
@@ -1159,7 +1361,10 @@ namespace WeChatWASM
 
         public static void convertDataPackageJS()
         {
-            checkNeedRmovePackageParallelPreload();
+            if (!isPlayableBuild)
+            {
+                checkNeedRmovePackageParallelPreload();
+            }
 
             var loadDataFromCdn = config.ProjectConf.assetLoadType == 0;
             Rule[] rules =
@@ -1278,7 +1483,7 @@ namespace WeChatWASM
             RemoveOldAssetPackage(Path.Combine(config.ProjectConf.DST, webglDir));
             RemoveOldAssetPackage(Path.Combine(config.ProjectConf.DST, webglDir + "-min"));
             var buildTemplate = new BuildTemplate(
-                Path.Combine(UnityUtil.GetWxSDKRootPath(), "Runtime", "wechat-default"),
+                Path.Combine(UnityUtil.GetWxSDKRootPath(), "Runtime", defaultTemplateDir),
                 Path.Combine(Application.dataPath, "WX-WASM-SDK-V2", "Editor", "template"),
                 Path.Combine(config.ProjectConf.DST, miniGameDir)
                 );
@@ -1288,12 +1493,15 @@ namespace WeChatWASM
             if (File.Exists(symbolPath))
             {
                 File.Copy(symbolPath, Path.Combine(config.ProjectConf.DST, miniGameDir, "webgl.wasm.symbols.unityweb"), true);
+                // gen symbols.br
+                Brotlib("webgl.wasm.symbols.unityweb.br", symbolPath, Path.Combine(config.ProjectConf.DST, miniGameDir, "webgl.wasm.symbols.unityweb.br"));
             }
 
             var info = new FileInfo(dataPath);
             dataFileSize = info.Length.ToString();
             UnityEngine.Debug.LogFormat("[Converter] that to genarate md5 and copy files ended");
-            if (config.ProjectConf.Appid == "wx7c792ca878775717") // 快适配小游戏示例
+            // 若APPID为快适配小游戏示例，则插入预览盒子
+            if (config.ProjectConf.Appid == "wx7c792ca878775717")
             {
                 InsertPreviewCode();
             }
@@ -1402,14 +1610,9 @@ namespace WeChatWASM
                     "      } else {\n" +
                     "        this._send = GameGlobal.Module.SendMessage;\n" +
                     "      }",
-                },
-                new Rule()
-                {
-                    old = "3.5.1", // project.config.json 转换插件 hardcode
-                    newStr = "latest",
                 }
             };
-            string[] files = { "game.js", "game.json", "unity-sdk/module-helper.js", "project.config.json" };
+            string[] files = { "game.js", "game.json", "unity-sdk/module-helper.js" };
             ReplaceFileContent(files, rules);
             Debug.LogWarning("[WeChat Preview] InsertPreviewCode End");
         }
@@ -1421,7 +1624,7 @@ namespace WeChatWASM
             var shortFilename = filename.Substring(filename.IndexOf('.') + 1);
 
             // 如果code没有发生过变化，且压缩方式不变，则不再进行br压缩
-            if (File.Exists(cachePath) && lastBrotliType == config.CompileOptions.brotliMT)
+            if (cachePath.Contains("wasm.code") && File.Exists(cachePath) && lastBrotliType == config.CompileOptions.brotliMT)
             {
                 File.Copy(cachePath, targetPath, true);
                 return 0;
@@ -1511,7 +1714,8 @@ namespace WeChatWASM
                 writer.PrettyPrint = true;
 
                 // 将 game.json 里面关系链相关的配置删除
-                if (!config.SDKOptions.UseFriendRelation)
+                // 试玩 game.json 中不含其他配置
+                if (!config.SDKOptions.UseFriendRelation && gameJson.ContainsKey("openDataContext") && gameJson.ContainsKey("plugins"))
                 {
                     gameJson.Remove("openDataContext");
                     gameJson["plugins"].Remove("Layout");
@@ -1522,7 +1726,7 @@ namespace WeChatWASM
                     Directory.Delete(openDataDir, true);
                 }
 
-                if (!config.SDKOptions.UseMiniGameChat)
+                if (!config.SDKOptions.UseMiniGameChat && gameJson.ContainsKey("plugins"))
                 {
                     gameJson["plugins"].Remove("MiniGameChat");
                     UnityEngine.Debug.Log(gameJson["plugins"]);
@@ -1609,17 +1813,20 @@ namespace WeChatWASM
             {
                 dst = Path.Combine(config.ProjectConf.DST, miniGameDir);
             }
-            string content = File.ReadAllText(Path.Combine(UnityUtil.GetWxSDKRootPath(), "Runtime", "wechat-default", "unity-sdk", "index.js"), Encoding.UTF8);
+            string content = File.ReadAllText(Path.Combine(UnityUtil.GetWxSDKRootPath(), "Runtime", defaultTemplateDir, "unity-sdk", "index.js"), Encoding.UTF8);
             content = content.Replace("$unityVersion$", Application.unityVersion);
             File.WriteAllText(Path.Combine(dst, "unity-sdk", "index.js"), content, Encoding.UTF8);
             // content = File.ReadAllText(Path.Combine(Application.dataPath, "WX-WASM-SDK-V2", "Runtime", "wechat-default", "unity-sdk", "storage.js"), Encoding.UTF8);
-            content = File.ReadAllText(Path.Combine(UnityUtil.GetWxSDKRootPath(), "Runtime", "wechat-default", "unity-sdk", "storage.js"), Encoding.UTF8);
-            var PreLoadKeys = config.PlayerPrefsKeys.Count > 0 ? JsonMapper.ToJson(config.PlayerPrefsKeys) : "[]";
-            content = content.Replace("'$PreLoadKeys'", PreLoadKeys);
-            File.WriteAllText(Path.Combine(dst, "unity-sdk", "storage.js"), content, Encoding.UTF8);
+            if (!isPlayableBuild)
+            {
+                content = File.ReadAllText(Path.Combine(UnityUtil.GetWxSDKRootPath(), "Runtime", defaultTemplateDir, "unity-sdk", "storage.js"), Encoding.UTF8);
+                var PreLoadKeys = config.PlayerPrefsKeys.Count > 0 ? JsonMapper.ToJson(config.PlayerPrefsKeys) : "[]";
+                content = content.Replace("'$PreLoadKeys'", PreLoadKeys);
+                File.WriteAllText(Path.Combine(dst, "unity-sdk", "storage.js"), content, Encoding.UTF8);
+            }
             // 修改纹理dxt
             // content = File.ReadAllText(Path.Combine(Application.dataPath, "WX-WASM-SDK-V2", "Runtime", "wechat-default", "unity-sdk", "texture.js"), Encoding.UTF8);
-            content = File.ReadAllText(Path.Combine(UnityUtil.GetWxSDKRootPath(), "Runtime", "wechat-default", "unity-sdk", "texture.js"), Encoding.UTF8);
+            content = File.ReadAllText(Path.Combine(UnityUtil.GetWxSDKRootPath(), "Runtime", defaultTemplateDir, "unity-sdk", "texture.js"), Encoding.UTF8);
             File.WriteAllText(Path.Combine(dst, "unity-sdk", "texture.js"), content, Encoding.UTF8);
         }
 
@@ -1836,14 +2043,15 @@ namespace WeChatWASM
             UnityEngine.Debug.LogFormat("[Converter] Starting to modify configs");
 
             var PRELOAD_LIST = GetPreloadList(config.ProjectConf.preloadFiles);
-            var imgSrc = HandleLoadingImage();
+            // 试玩不存在封面图
+            var imgSrc = isPlayableBuild ? "" : HandleLoadingImage();
 
             var bundlePathIdentifierStr = GetArrayString(config.ProjectConf.bundlePathIdentifier);
             var excludeFileExtensionsStr = GetArrayString(config.ProjectConf.bundleExcludeExtensions);
 
             var screenOrientation = new List<string>() { "portrait", "landscape", "landscapeLeft", "landscapeRight" }[(int)config.ProjectConf.Orientation];
-
-            var customUnicodeRange = GetCustomUnicodeRange(config.FontOptions.CustomUnicode);
+            // 试玩不支持系统字体
+            var customUnicodeRange = isPlayableBuild ? "[]" : GetCustomUnicodeRange(config.FontOptions.CustomUnicode);
             Debug.Log("[Converter] customUnicodeRange: " + customUnicodeRange);
 
             var boolConfigInfo = GenerateBootInfo();
@@ -1911,10 +2119,19 @@ namespace WeChatWASM
                 config.CompileOptions.DevelopBuild ? "true" : "false",
                 config.CompileOptions.enablePerfAnalysis ? "true" : "false",
                 config.ProjectConf.MemorySize.ToString(),
+                config.SDKOptions.disableMultiTouch ? "true" : "false",
+                // Perfstream，暂时设为false
+                "false",
+                config.CompileOptions.enableEmscriptenGLX ? "true" : "false",
+                config.CompileOptions.enableiOSMetal ? "true" : "false"
             });
 
             List<Rule> replaceList = new List<Rule>(replaceArrayList);
             List<string> files = new List<string> { "game.js", "game.json", "project.config.json", "unity-namespace.js", "check-version.js", "unity-sdk/font/index.js" };
+            if (isPlayableBuild)
+            {
+                files = new List<string> { "game.js", "game.json", "project.config.json", "unity-namespace.js", "check-version.js" };
+            }
 
             if (WXRuntimeExtEnvDef.IsPreviewing)
             {
@@ -2055,7 +2272,9 @@ namespace WeChatWASM
             {
                 var importer = AssetImporter.GetAtPath(jsLibs[i]) as PluginImporter;
                 bool value = i == index;
-#if PLATFORM_WEIXINMINIGAME
+#if PLATFORM_PLAYABLEADS
+                importer.SetCompatibleWithPlatform(BuildTarget.PlayableAds, value);
+#elif PLATFORM_WEIXINMINIGAME
                 importer.SetCompatibleWithPlatform(BuildTarget.WeixinMiniGame, value);
 #else
                 importer.SetCompatibleWithPlatform(BuildTarget.WebGL, value);

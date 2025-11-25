@@ -1,5 +1,6 @@
 #if UNITY_WEBGL || WEIXINMINIGAME || UNITY_EDITOR
 using System;
+using System.Collections.Generic;
 
 namespace WeChatWASM
 {
@@ -276,9 +277,19 @@ namespace WeChatWASM
         }
 
         /// <summary>
+        /// [wx.exitChatTool(Object object)](https://developers.weixin.qq.com/minigame/dev/api/chattool/wx.exitChatTool.html)
+        /// 需要基础库： `3.7.12`
+        /// 退出聊天工具模式
+        /// </summary>
+        public static void ExitChatTool(ExitChatToolOption callback)
+        {
+            WXSDKManagerHandler.Instance.ExitChatTool(callback);
+        }
+
+        /// <summary>
         /// [wx.exitMiniProgram(Object object)](https://developers.weixin.qq.com/minigame/dev/api/navigate/wx.exitMiniProgram.html)
         /// 需要基础库： `2.17.3`
-        /// 退出当前小程序。必须有点击行为才能调用成功。
+        /// 退出当前小程序
         /// </summary>
         public static void ExitMiniProgram(ExitMiniProgramOption callback)
         {
@@ -511,6 +522,45 @@ namespace WeChatWASM
         }
 
         /// <summary>
+        /// [wx.getChatToolInfo(Object object)](https://developers.weixin.qq.com/minigame/dev/api/chattool/wx.getChatToolInfo.html)
+        /// 需要基础库： `3.7.12`
+        /// 获取聊天工具模式下的群聊信息。
+        /// 需要注意的是，单聊群和多聊群下返回的群唯一标识是不同的。
+        /// 1. 多聊群下返回 opengid
+        /// 2. 单聊群下返回 open_single_roomid
+        /// 同时将返回用户在群(含单聊)下的唯一标识 group_openid。
+        /// **示例代码**
+        /// ```js
+        /// wx.getChatToolInfo({
+        /// success(res) {
+        /// // res
+        /// {
+        /// errMsg: 'getChatToolInfo:ok',
+        /// encryptedData: '',
+        /// iv: ''
+        /// }
+        /// },
+        /// fail() {
+        /// }
+        /// })
+        /// ```
+        /// 敏感数据有两种获取方式，一是使用 [加密数据解密算法](https://developers.weixin.qq.com/minigame/dev/guide/open-ability/signature.html#加密数据解密算法) 。
+        /// 获取得到的开放数据为以下 json 结构（其中 opengid 为当前群的唯一标识）：
+        /// ```json
+        /// {
+        /// "opengid": "OPENGID",       // 多聊群下返回的群唯一标识
+        /// "open_single_roomid": "",   // 单聊群下返回的群唯一标识
+        /// "group_openid": "",         // 用户在当前群的唯一标识
+        /// "chat_type": 3,             // 聊天室类型
+        /// }
+        /// ```
+        /// </summary>
+        public static void GetChatToolInfo(GetChatToolInfoOption callback)
+        {
+            WXSDKManagerHandler.Instance.GetChatToolInfo(callback);
+        }
+
+        /// <summary>
         /// [wx.getClipboardData(Object object)](https://developers.weixin.qq.com/minigame/dev/api/device/clipboard/wx.getClipboardData.html)
         /// 需要基础库： `1.1.0`
         /// 获取系统剪贴板的内容
@@ -628,7 +678,7 @@ namespace WeChatWASM
         /// **encryptedData 解密后得到的 GameClubData 的结构**
         /// | 属性 | 类型 | 说明                                   |
         /// | ------- | ------- | -------------------------------------- |
-        /// |  dataList   | Array<GameClubDataByType> | 游戏圈相关数据的对象数组           |
+        /// |  dataList   | Array\<GameClubDataByType\> | 游戏圈相关数据的对象数组           |
         /// **GameClubDataByType 的结构**
         /// | 属性 | 类型 | 说明                                   |
         /// | ------- |------- |  -------------------------------------- |
@@ -641,12 +691,23 @@ namespace WeChatWASM
         }
 
         /// <summary>
+        /// [wx.getGameExptInfo(Object object)](https://developers.weixin.qq.com/minigame/dev/api/data-analysis/wx.getGameExptInfo.html)
+        /// 需要基础库： `3.8.8`
+        /// 给定实验参数数组，获取对应的实验参数值
+        /// </summary>
+        public static void GetGameExptInfo(GetGameExptInfoOption callback)
+        {
+            WXSDKManagerHandler.Instance.GetGameExptInfo(callback);
+        }
+
+        /// <summary>
         /// [wx.getGroupEnterInfo(Object object)](https://developers.weixin.qq.com/minigame/dev/api/open-api/group/wx.getGroupEnterInfo.html)
         /// 需要基础库： `2.10.4`
         /// 获取微信群聊场景下的小程序启动信息。群聊场景包括群聊小程序消息卡片、群待办、群工具。可用于获取当前群的 opengid。
         /// ## 注意事项
         /// - 基础库 v2.10.4 开始支持获取群工具小程序启动信息
         /// - 基础库 v2.17.3 开始支持获取群聊小程序消息卡片、群待办小程序启动信息
+        /// - 基础库 v3.7.8 支持获取单聊群启动信息，获取的群(含单聊)唯一标识，可用于[聊天工具模式](https://developers.weixin.qq.com/minigame/dev/api/chattool/wx.openChatTool.html)。
         /// **示例代码**
         /// ```js
         /// wx.getGroupEnterInfo({
@@ -666,7 +727,10 @@ namespace WeChatWASM
         /// 获取得到的开放数据为以下 json 结构（其中 opengid 为当前群的唯一标识）：
         /// ```json
         /// {
-        /// "opengid": "OPENGID"
+        /// "opengid": "OPENGID",       // 多聊群下返回的群唯一标识
+        /// "open_single_roomid": "",   // 单聊群下返回的群唯一标识
+        /// "group_openid": "",         // 用户在当前群的唯一标识
+        /// "chat_type": 3,             // 聊天室类型
         /// }
         /// ```
         /// **Tips**
@@ -676,6 +740,16 @@ namespace WeChatWASM
         public static void GetGroupEnterInfo(GetGroupEnterInfoOption callback)
         {
             WXSDKManagerHandler.Instance.GetGroupEnterInfo(callback);
+        }
+
+        /// <summary>
+        /// [wx.getGroupMembersInfo(Object object)](https://developers.weixin.qq.com/minigame/dev/api/open-api/data/wx.getGroupMembersInfo.html)
+        /// 需要基础库： `3.7.12`
+        /// 获取所选群成员的头像、昵称，自行在开放数据域中渲染
+        /// </summary>
+        public static void GetGroupMembersInfo(GetGroupMembersInfoOption callback)
+        {
+            WXSDKManagerHandler.Instance.GetGroupMembersInfo(callback);
         }
 
         /// <summary>
@@ -737,9 +811,6 @@ namespace WeChatWASM
         /// <summary>
         /// [wx.getPhoneNumber(Object object)](https://developers.weixin.qq.com/minigame/dev/api/open-api/user-info/wx.getPhoneNumber.html)
         /// 手机号快速验证，向用户申请，并在用户同意后，快速填写和验证手机 [具体说明](https://developers.weixin.qq.com/minigame/dev/guide/open-ability/getPhoneNumber.html)
-        /// ****
-        /// ## 注意事项
-        /// - 用户点击后才可进行调用
         /// </summary>
         public static void GetPhoneNumber(GetPhoneNumberOption callback)
         {
@@ -790,10 +861,11 @@ namespace WeChatWASM
         /// **示例代码**
         /// ```js
         /// wx.getScreenRecordingState({
-        ///  success: function (res) {
-        ///    console.log(res.state)
-        ///  },
+        /// success: function (res) {
+        /// console.log(res.state)
+        /// },
         /// })
+        /// ```
         /// </summary>
         public static void GetScreenRecordingState(GetScreenRecordingStateOption callback)
         {
@@ -845,24 +917,22 @@ namespace WeChatWASM
         }
 
         /// <summary>
-        /// [wx.getShareInfo(Object object)](https://developers.weixin.qq.com/minigame/dev/api/share/wx.getShareInfo.html)
-        /// 需要基础库： `1.1.0`
-        /// 获取转发详细信息（主要是获取群ID）。 从群聊内的小程序消息卡片打开小程序时，调用此接口才有效。从基础库 v2.17.3 开始，推荐用 [wx.getGroupEnterInfo](https://developers.weixin.qq.com/minigame/dev/api/open-api/group/wx.getGroupEnterInfo.html) 替代此接口。
+        /// [wx.getShowSplashAdStatus(Object object)](https://developers.weixin.qq.com/minigame/dev/api/ad/wx.getShowSplashAdStatus.html)
+        /// 需要基础库： `3.7.8`
+        /// 获取封面广告组件展示状态。请通过 [wx.getSystemInfoSync()](https://developers.weixin.qq.com/minigame/dev/api/base/system/wx.getSystemInfoSync.html) 返回对象的 SDKVersion 判断基础库版本号后再使用该 API（小游戏端要求 >= 3.7.8， 小程序端要求 >= 3.7.8）。
         /// **示例代码**
-        /// 敏感数据获取方式 [加密数据解密算法](https://developers.weixin.qq.com/minigame/dev/guide/open-ability/signature.html#加密数据解密算法) 。
-        /// 获取得到的开放数据为以下 json 结构（其中 openGId 为当前群的唯一标识）：
-        /// ```json
-        /// {
-        /// "openGId": "OPENGID"
-        /// }
+        /// ```js
+        /// // 获取封面广告展示状态
+        /// wx.getShowSplashAdStatus({
+        /// success: res => {
+        /// console.log('getShowSplashAdStatus res', res.status, res.code)
+        /// },
+        /// })
         /// ```
-        /// **Tips**
-        /// - 如需要展示群名称，小程序可以使用 [开放数据组件](https://developers.weixin.qq.com/minigame/dev/guide/open-ability/open-data.html)
-        /// - 小游戏可以通过 [`wx.getGroupInfo`](https://developers.weixin.qq.com/minigame/dev/api/open-api/data/wx.getGroupInfo.html) 接口获取群名称
         /// </summary>
-        public static void GetShareInfo(GetShareInfoOption callback)
+        public static void GetShowSplashAdStatus(GetShowSplashAdStatusOption callback)
         {
-            WXSDKManagerHandler.Instance.GetShareInfo(callback);
+            WXSDKManagerHandler.Instance.GetShowSplashAdStatus(callback);
         }
 
         /// <summary>
@@ -1251,6 +1321,16 @@ namespace WeChatWASM
         }
 
         /// <summary>
+        /// [wx.notifyGroupMembers(Object object)](https://developers.weixin.qq.com/minigame/dev/api/chattool/wx.notifyGroupMembers.html)
+        /// 需要基础库： `3.7.12`
+        /// 提醒用户完成任务，标题长度不超过 30 个字符，支持中英文和数字，中文算2个字符。
+        /// </summary>
+        public static void NotifyGroupMembers(NotifyGroupMembersOption callback)
+        {
+            WXSDKManagerHandler.Instance.NotifyGroupMembers(callback);
+        }
+
+        /// <summary>
         /// [wx.openAppAuthorizeSetting(Object object)](https://developers.weixin.qq.com/minigame/dev/api/base/system/wx.openAppAuthorizeSetting.html)
         /// 需要基础库： `2.25.3`
         /// 跳转系统微信授权管理页
@@ -1362,9 +1442,22 @@ namespace WeChatWASM
         }
 
         /// <summary>
+        /// [wx.openChatTool(Object object)](https://developers.weixin.qq.com/minigame/dev/api/chattool/wx.openChatTool.html)
+        /// 需要基础库： `3.7.12`
+        /// 进入聊天工具模式。
+        ///  1. 不传入聊天室id时，微信会拉起聊天列表让用户选择，用户选择后绑定聊天室进入聊天工具模式。
+        ///  2. 传入聊天室id时（群聊为opengid，单聊为open_single_roomid），会直接绑定该聊天室进入，此时必须传入对应的 chatType。
+        ///  3. 聊天室类型可从 [[getGroupEnterInfo]](https://developers.weixin.qq.com/minigame/dev/api/open-api/group/wx.getGroupEnterInfo.html) 返回值中获取。
+        /// </summary>
+        public static void OpenChatTool(OpenChatToolOption callback)
+        {
+            WXSDKManagerHandler.Instance.OpenChatTool(callback);
+        }
+
+        /// <summary>
         /// [wx.openCustomerServiceChat(Object object)](https://developers.weixin.qq.com/minigame/dev/api/open-api/service-chat/wx.openCustomerServiceChat.html)
         /// 需要基础库： `2.30.4`
-        /// 打开微信客服，页面产生点击事件（例如 button 上 bindtap 的回调中）后才可调用。了解更多信息，可以参考[微信客服介绍](https://work.weixin.qq.com/kf/)。
+        /// 打开微信客服，页面产生点击事件后才可调用。了解更多信息，可以参考[微信客服介绍](https://work.weixin.qq.com/kf/)。
         /// **示例代码**
         /// ```js
         /// wx.openCustomerServiceChat({
@@ -1382,7 +1475,7 @@ namespace WeChatWASM
         /// <summary>
         /// [wx.openCustomerServiceConversation(Object object)](https://developers.weixin.qq.com/minigame/dev/api/open-api/customer-message/wx.openCustomerServiceConversation.html)
         /// 需要基础库： `2.0.3`
-        /// 进入客服会话。要求在用户发生过至少一次 touch 事件后才能调用。后台接入方式与小程序一致，详见 [客服消息接入](https://developers.weixin.qq.com/miniprogram/dev/framework/open-ability/customer-message/customer-message.html)
+        /// 进入客服会话。要求在用户发生过至少一次 touch 事件后才能调用。后台接入方式与小程序一致，详见 [客服消息接入](https://developers.weixin.qq.com/minigame/dev/guide/open-ability/customer-message/customer-message.html)
         /// **注意事项**
         /// - 在客服会话内点击小程序消息卡片进入小程序时，不能通过 wx.onShow 或 wx.getEnterOptionsSync 等接口获取启动路径和参数，而是应该通过 wx.openCustomerServiceConversation 接口的 success 回调获取启动路径和参数
         /// </summary>
@@ -1453,6 +1546,16 @@ namespace WeChatWASM
         public static void OpenSystemBluetoothSetting(OpenSystemBluetoothSettingOption callback)
         {
             WXSDKManagerHandler.Instance.OpenSystemBluetoothSetting(callback);
+        }
+
+        /// <summary>
+        /// [wx.operateGameRecorderVideo(Object object)](https://developers.weixin.qq.com/minigame/dev/api/game-recorder/wx.operateGameRecorderVideo.html)
+        /// 需要基础库： `2.26.1`
+        /// 分享游戏对局回放。安卓微信8.0.28开始支持，iOS微信8.0.30开始支持。
+        /// </summary>
+        public static void OperateGameRecorderVideo(OperateGameRecorderVideoOption callback)
+        {
+            WXSDKManagerHandler.Instance.OperateGameRecorderVideo(callback);
         }
 
         /// <summary>
@@ -1738,7 +1841,6 @@ namespace WeChatWASM
         /// 需要基础库： `2.9.4`
         /// 调起小游戏系统订阅消息界面，返回用户订阅消息的操作结果。当用户勾选了订阅面板中的“总是保持以上选择，不再询问”时，模板消息会被添加到用户的小游戏设置页，通过 [wx.getSetting](https://developers.weixin.qq.com/minigame/dev/api/open-api/setting/wx.getSetting.html) 接口可获取用户对相关模板消息的订阅状态。
         /// ## 注意事项
-        /// - 需要在 touchend 事件的回调中调用。
         /// - 使用前建议阅读 [小游戏系统订阅消息使用指引](https://developers.weixin.qq.com/minigame/dev/guide/open-ability/subscribe-system-message.html)。
         /// - 系统订阅消息只需要订阅一次，永久有效。
         /// **错误码**
@@ -1873,6 +1975,25 @@ namespace WeChatWASM
         public static void ScanCode(ScanCodeOption callback)
         {
             WXSDKManagerHandler.Instance.ScanCode(callback);
+        }
+
+        /// <summary>
+        /// [wx.selectGroupMembers(Object object)](https://developers.weixin.qq.com/minigame/dev/api/chattool/wx.selectGroupMembers.html)
+        /// 需要基础库： `3.7.12`
+        /// 选择聊天室的成员，并返回选择成员的 group_openid。若当前为群聊，则会拉起成员选择器；若当前为单聊，则直接返回双方的 group_openid。
+        /// ****
+        /// ```js
+        /// wx.selectGroupMembers({
+        /// maxSelectCount: 3,
+        /// success(res) {
+        /// // res.members
+        /// }
+        /// })
+        /// ```
+        /// </summary>
+        public static void SelectGroupMembers(SelectGroupMembersOption callback)
+        {
+            WXSDKManagerHandler.Instance.SelectGroupMembers(callback);
         }
 
         /// <summary>
@@ -2038,6 +2159,56 @@ namespace WeChatWASM
         }
 
         /// <summary>
+        /// [wx.shareAppMessageToGroup(Object object)](https://developers.weixin.qq.com/minigame/dev/api/chattool/wx.shareAppMessageToGroup.html)
+        /// 需要基础库： `3.7.12`
+        /// 转发小程序卡片到聊天
+        /// </summary>
+        public static void ShareAppMessageToGroup(ShareAppMessageToGroupOption callback)
+        {
+            WXSDKManagerHandler.Instance.ShareAppMessageToGroup(callback);
+        }
+
+        /// <summary>
+        /// [wx.shareEmojiToGroup(Object object)](https://developers.weixin.qq.com/minigame/dev/api/chattool/wx.shareEmojiToGroup.html)
+        /// 需要基础库： `3.7.12`
+        /// 转发表情到聊天
+        /// </summary>
+        public static void ShareEmojiToGroup(ShareEmojiToGroupOption callback)
+        {
+            WXSDKManagerHandler.Instance.ShareEmojiToGroup(callback);
+        }
+
+        /// <summary>
+        /// [wx.shareImageToGroup(Object object)](https://developers.weixin.qq.com/minigame/dev/api/chattool/wx.shareImageToGroup.html)
+        /// 需要基础库： `3.7.12`
+        /// 转发图片到聊天
+        /// </summary>
+        public static void ShareImageToGroup(ShareImageToGroupOption callback)
+        {
+            WXSDKManagerHandler.Instance.ShareImageToGroup(callback);
+        }
+
+        /// <summary>
+        /// [wx.shareTextToGroup(Object object)](https://developers.weixin.qq.com/minigame/dev/api/chattool/wx.shareTextToGroup.html)
+        /// 需要基础库： `3.7.12`
+        /// 转发文本到聊天
+        /// </summary>
+        public static void ShareTextToGroup(ShareTextToGroupOption callback)
+        {
+            WXSDKManagerHandler.Instance.ShareTextToGroup(callback);
+        }
+
+        /// <summary>
+        /// [wx.shareVideoToGroup(Object object)](https://developers.weixin.qq.com/minigame/dev/api/chattool/wx.shareVideoToGroup.html)
+        /// 需要基础库： `3.7.12`
+        /// 转发视频到聊天
+        /// </summary>
+        public static void ShareVideoToGroup(ShareVideoToGroupOption callback)
+        {
+            WXSDKManagerHandler.Instance.ShareVideoToGroup(callback);
+        }
+
+        /// <summary>
         /// [wx.showActionSheet(Object object)](https://developers.weixin.qq.com/minigame/dev/api/ui/interaction/wx.showActionSheet.html)
         /// 显示操作菜单
         /// **示例代码**
@@ -2123,9 +2294,6 @@ namespace WeChatWASM
         /// [wx.showShareImageMenu(Object object)](https://developers.weixin.qq.com/minigame/dev/api/share/wx.showShareImageMenu.html)
         /// 需要基础库： `2.14.3`
         /// 打开分享图片弹窗，可以将图片发送给朋友、收藏或下载
-        /// **Bug & Tip**
-        /// 1. `tip`: `needShowEntrance`分享的图片消息是否要带小程序入口，支持申明类目：商家自营、电商平台、餐饮服务(餐饮服务场所/餐饮服务管理企业、点餐平台、外卖平台)、旅游服务(住宿服务、景区服务、OTA、旅游管理单位)、生活服务(家政服务、丽人服务、宠物(非医院类)、婚庆服务、洗浴保健、休闲娱乐、百货/超市/便利店、开锁服务、营业性演出票务、其他宠物健康服务、洗浴保健平台、共享服务、跑腿、寄存、求职/招聘)
-        /// 2. `tip`: `needShowEntrance`小游戏所有类目都支持
         /// </summary>
         public static void ShowShareImageMenu(ShowShareImageMenuOption callback)
         {
@@ -2135,7 +2303,7 @@ namespace WeChatWASM
         /// <summary>
         /// [wx.showShareMenu(Object object)](https://developers.weixin.qq.com/minigame/dev/api/share/wx.showShareMenu.html)
         /// 需要基础库： `1.1.0`
-        /// 显示当前页面的转发按钮
+        /// 设置右上角点开的详情界面中的分享按钮是否可用
         /// ****
         /// ## 注意事项
         /// - "shareAppMessage"表示“发送给朋友”按钮，"shareTimeline"表示“分享到朋友圈”按钮
@@ -2551,13 +2719,13 @@ namespace WeChatWASM
         }
 
         /// <summary>
-        /// [wx.operateGameRecorderVideo(Object object)](https://developers.weixin.qq.com/minigame/dev/api/game-recorder/wx.operateGameRecorderVideo.html)
-        /// 需要基础库： `2.26.1`
-        /// 分享游戏对局回放。安卓微信8.0.28开始支持，iOS微信8.0.30开始支持。
+        /// [wx.isChatTool()](https://developers.weixin.qq.com/minigame/dev/api/chattool/wx.isChatTool.html)
+        /// 需要基础库： `3.7.12`
+        /// 是否处于聊天工具模式
         /// </summary>
-        public static void OperateGameRecorderVideo(OperateGameRecorderVideoOption option)
+        public static void IsChatTool()
         {
-            WXSDKManagerHandler.Instance.OperateGameRecorderVideo(option);
+            WXSDKManagerHandler.Instance.IsChatTool();
         }
 
         /// <summary>
@@ -2590,7 +2758,7 @@ namespace WeChatWASM
         /// 需要基础库： `2.14.4`
         /// 事件上报
         /// </summary>
-        public static void ReportEvent<T>(string eventId, T data)
+        public static void ReportEvent(string eventId, Dictionary<string, string> data)
         {
             WXSDKManagerHandler.Instance.ReportEvent(eventId, data);
         }
@@ -2613,7 +2781,7 @@ namespace WeChatWASM
         /// <summary>
         /// [wx.reportUserBehaviorBranchAnalytics(Object object)](https://developers.weixin.qq.com/minigame/dev/api/data-analysis/wx.reportUserBehaviorBranchAnalytics.html)
         /// 需要基础库： `2.12.0`
-        /// 用于分支相关的UI组件（一般是按钮）相关事件的上报，事件目前有曝光、点击两种
+        /// 上报场景分析，用于UI组件（一般是按钮）相关事件的上报，事件目前有曝光、点击两种，查看[相关文档](https://developers.weixin.qq.com/minigame/analysis/selfanalysis.html)
         /// </summary>
         public static void ReportUserBehaviorBranchAnalytics(ReportUserBehaviorBranchAnalyticsOption option)
         {
@@ -2624,13 +2792,13 @@ namespace WeChatWASM
         /// [wx.requestPointerLock()](https://developers.weixin.qq.com/minigame/dev/api/render/cursor/wx.requestPointerLock.html)
         /// 需要基础库： `3.2.0`
         /// 锁定鼠标指针。锁定指针后，鼠标会被隐藏，可以通过 [wx.touchMove](#) 事件获取鼠标偏移量。 **此接口仅在 Windows、Mac 端支持，且必须在用户进行操作后才可调用。**
-        /// **示例代码</title>
+        /// **示例代码**
         /// ```js
         /// wx.onTouchEnd(() => {
         /// wx.requestPointerLock() // 触发鼠标锁定
         /// })
         /// ```
-        /// <title>示例 demo**
+        /// **示例 demo**
         /// 下方打开后点按窗口会鼠标锁定，同时会在 touchMove 时持续在控制台打印偏移量。
         /// [https://developers.weixin.qq.com/s/wGruMHm97tMF](https://developers.weixin.qq.com/s/wGruMHm97tMF)
         /// </summary>
@@ -2647,23 +2815,6 @@ namespace WeChatWASM
         public static void RevokeBufferURL(string url)
         {
             WXSDKManagerHandler.Instance.RevokeBufferURL(url);
-        }
-
-        /// <summary>
-        /// [wx.setStorageSync(string key, any data)](https://developers.weixin.qq.com/minigame/dev/api/storage/wx.setStorageSync.html)
-        /// 将数据存储在本地缓存中指定的 key 中。会覆盖掉原来该 key 对应的内容。除非用户主动删除或因存储空间原因被系统清理，否则数据都一直可用。单个 key 允许存储的最大数据长度为 1MB，所有数据存储上限为 10MB。
-        /// **注意**
-        /// storage 应只用来进行数据的持久化存储，不应用于运行时的数据传递或全局状态管理。启动过程中过多的同步读写存储，会显著影响启动耗时。
-        /// **示例代码**
-        /// ```js
-        /// try {
-        /// wx.setStorageSync('key', 'value')
-        /// } catch (e) { }
-        /// ```
-        /// </summary>
-        public static void SetStorageSync<T>(string key, T data)
-        {
-            WXSDKManagerHandler.Instance.SetStorageSync(key, data);
         }
 
         /// <summary>
@@ -2974,14 +3125,44 @@ namespace WeChatWASM
         /// [wx.onError(function listener)](https://developers.weixin.qq.com/minigame/dev/api/base/app/app-event/wx.onError.html)
         /// 监听全局错误事件
         /// </summary>
-        public static void OnError(Action<Error> error)
+        public static void OnError(Action<ListenerError> error)
         {
             WXSDKManagerHandler.Instance.OnError(error);
         }
 
-        public static void OffError(Action<Error> error)
+        public static void OffError(Action<ListenerError> error)
         {
             WXSDKManagerHandler.Instance.OffError(error);
+        }
+
+        /// <summary>
+        /// [wx.onGamepadConnected(function listener)](https://developers.weixin.qq.com/minigame/dev/api/device/gamepad/wx.onGamepadConnected.html)
+        /// 需要基础库： `3.6.4`
+        /// 监听用户已连接游戏手柄的事件。
+        /// </summary>
+        public static void OnGamepadConnected(Action<OnGamepadConnectedListenerResult> result)
+        {
+            WXSDKManagerHandler.Instance.OnGamepadConnected(result);
+        }
+
+        public static void OffGamepadConnected(Action<OnGamepadConnectedListenerResult> result)
+        {
+            WXSDKManagerHandler.Instance.OffGamepadConnected(result);
+        }
+
+        /// <summary>
+        /// [wx.onGamepadDisconnected(function listener)](https://developers.weixin.qq.com/minigame/dev/api/device/gamepad/wx.onGamepadDisconnected.html)
+        /// 需要基础库： `3.6.4`
+        /// 监听用户断开游戏手柄的事件。
+        /// </summary>
+        public static void OnGamepadDisconnected(Action<OnGamepadDisconnectedListenerResult> result)
+        {
+            WXSDKManagerHandler.Instance.OnGamepadDisconnected(result);
+        }
+
+        public static void OffGamepadDisconnected(Action<OnGamepadDisconnectedListenerResult> result)
+        {
+            WXSDKManagerHandler.Instance.OffGamepadDisconnected(result);
         }
 
         /// <summary>
@@ -3045,7 +3226,7 @@ namespace WeChatWASM
 
         /// <summary>
         /// [wx.onKeyboardComplete(function listener)](https://developers.weixin.qq.com/minigame/dev/api/device/keyboard/wx.onKeyboardComplete.html)
-        /// 监听监听键盘收起的事件
+        /// 监听键盘收起的事件
         /// </summary>
         public static void OnKeyboardComplete(Action<OnKeyboardInputListenerResult> result)
         {
@@ -3114,9 +3295,9 @@ namespace WeChatWASM
         /// **示例代码**
         /// ```js
         /// wx.onMemoryWarning(function () {
-        ///  console.log('onMemoryWarningReceive')
+        /// console.log('onMemoryWarningReceive')
         /// })
-        /// ``
+        /// ```
         /// </summary>
         public static void OnMemoryWarning(Action<OnMemoryWarningListenerResult> result)
         {
@@ -3126,28 +3307,6 @@ namespace WeChatWASM
         public static void OffMemoryWarning(Action<OnMemoryWarningListenerResult> result)
         {
             WXSDKManagerHandler.Instance.OffMemoryWarning(result);
-        }
-
-        /// <summary>
-        /// [wx.onMenuButtonBoundingClientRectWeightChange(function listener)](https://developers.weixin.qq.com/minigame/dev/api/ui/menu/wx.onMenuButtonBoundingClientRectWeightChange.html)
-        /// 需要基础库： `3.4.3`
-        /// 监听菜单按钮（右上角胶囊按钮）的布局位置信息变化事件
-        /// **示例代码**
-        /// ```js
-        /// const callback = res => console.log('menuButtonBoundingClientRectWeightChange', res)
-        /// wx.onMenuButtonBoundingClientRectWeightChange(callback)
-        /// // 取消监听
-        /// wx.offMenuButtonBoundingClientRectWeightChange(callback)
-        /// ```
-        /// </summary>
-        public static void OnMenuButtonBoundingClientRectWeightChange(Action<OnMenuButtonBoundingClientRectWeightChangeListenerResult> result)
-        {
-            WXSDKManagerHandler.Instance.OnMenuButtonBoundingClientRectWeightChange(result);
-        }
-
-        public static void OffMenuButtonBoundingClientRectWeightChange(Action<OnMenuButtonBoundingClientRectWeightChangeListenerResult> result)
-        {
-            WXSDKManagerHandler.Instance.OffMenuButtonBoundingClientRectWeightChange(result);
         }
 
         /// <summary>
@@ -3246,6 +3405,28 @@ namespace WeChatWASM
         public static void OffNetworkWeakChange(Action<OnNetworkWeakChangeListenerResult> result)
         {
             WXSDKManagerHandler.Instance.OffNetworkWeakChange(result);
+        }
+
+        /// <summary>
+        /// [wx.onOfficialComponentsInfoChange(function listener)](https://developers.weixin.qq.com/minigame/dev/api/ui/menu/wx.onOfficialComponentsInfoChange.html)
+        /// 需要基础库： `3.7.12`
+        /// 监听官方组件信息变化事件
+        /// **示例代码**
+        /// ```js
+        /// const callback = res => console.log('officialComponentsInfoChange', res)
+        /// wx.onOfficialComponentsInfoChange(callback)
+        /// // 取消监听
+        /// wx.offOfficialComponentsInfoChange(callback)
+        /// ```
+        /// </summary>
+        public static void OnOfficialComponentsInfoChange(Action<OnOfficialComponentsInfoChangeListenerResult> result)
+        {
+            WXSDKManagerHandler.Instance.OnOfficialComponentsInfoChange(result);
+        }
+
+        public static void OffOfficialComponentsInfoChange(Action<OnOfficialComponentsInfoChangeListenerResult> result)
+        {
+            WXSDKManagerHandler.Instance.OffOfficialComponentsInfoChange(result);
         }
 
         /// <summary>
@@ -3430,9 +3611,24 @@ namespace WeChatWASM
         }
 
         /// <summary>
+        /// [wx.onWindowStateChange(function listener)](https://developers.weixin.qq.com/minigame/dev/api/ui/window/wx.onWindowStateChange.html)
+        /// 需要基础库： `3.8.8`
+        /// 监听小程序窗口状态变化事件。仅适用于 PC 平台
+        /// </summary>
+        public static void OnWindowStateChange(Action<OnWindowStateChangeListenerResult> result)
+        {
+            WXSDKManagerHandler.Instance.OnWindowStateChange(result);
+        }
+
+        public static void OffWindowStateChange(Action<OnWindowStateChangeListenerResult> result)
+        {
+            WXSDKManagerHandler.Instance.OffWindowStateChange(result);
+        }
+
+        /// <summary>
         /// [wx.onAddToFavorites(function listener)](https://developers.weixin.qq.com/minigame/dev/api/share/wx.onAddToFavorites.html)
         /// 需要基础库： `2.10.3`
-        /// 监听用户点击菜单「收藏」按钮时触发的事件（安卓7.0.15起支持，iOS 暂不支持）
+        /// 监听用户点击菜单「收藏」按钮时触发的事件
         /// </summary>
         public static void OnAddToFavorites(Action<Action<OnAddToFavoritesListenerResult>> callback)
         {
@@ -3504,6 +3700,24 @@ namespace WeChatWASM
         public static void OffGameLiveStateChange(Action<OnGameLiveStateChangeCallbackResult, Action<OnGameLiveStateChangeCallbackResponse>> callback = null)
         {
             WXSDKManagerHandler.Instance.OffGameLiveStateChange(callback);
+        }
+
+        /// <summary>
+        /// [Array.&lt;Object&gt; wx.getGamepads()](https://developers.weixin.qq.com/minigame/dev/api/device/gamepad/wx.getGamepads.html)
+        /// 需要基础库： `3.6.4`
+        /// 获取已连接的游戏手柄信息，仅在 PC 平台支持。
+        /// **示例代码**
+        /// ```js
+        /// const gamepads = wx.getGamepads();
+        /// console.log(gamepads);
+        /// ```
+        /// **示例代码片段**
+        /// [在微信开发者工具中查看示例](https://developers.weixin.qq.com/s/6al1r2m17oV6)
+        /// </summary>
+        /// <returns></returns>
+        public static Gamepad[] GetGamepads()
+        {
+            return WXSDKManagerHandler.GetGamepads();
         }
 
         /// <summary>
@@ -3659,9 +3873,9 @@ namespace WeChatWASM
         /// 而 wx.getExptInfoSync(['color']) 则只会返回 `{color:'#fff'}`
         /// </summary>
         /// <returns></returns>
-        public static T GetExptInfoSync<T>(string[] keys)
+        public static Dictionary<string, string> GetExptInfoSync(string[] keys)
         {
-            return WXSDKManagerHandler.GetExptInfoSync<T>(keys);
+            return WXSDKManagerHandler.GetExptInfoSync(keys);
         }
 
         /// <summary>
@@ -3677,9 +3891,9 @@ namespace WeChatWASM
         /// ```
         /// </summary>
         /// <returns></returns>
-        public static T GetExtConfigSync<T>()
+        public static Dictionary<string, string> GetExtConfigSync()
         {
-            return WXSDKManagerHandler.GetExtConfigSync<T>();
+            return WXSDKManagerHandler.GetExtConfigSync();
         }
 
         /// <summary>
@@ -3723,6 +3937,30 @@ namespace WeChatWASM
         public static ClientRect GetMenuButtonBoundingClientRect()
         {
             return WXSDKManagerHandler.GetMenuButtonBoundingClientRect();
+        }
+
+        /// <summary>
+        /// [Object wx.getOfficialComponentsInfo()](https://developers.weixin.qq.com/minigame/dev/api/ui/menu/wx.getOfficialComponentsInfo.html)
+        /// 需要基础库： `3.7.12`
+        /// 获取所有官方组件的相关信息
+        /// **示例代码**
+        /// ```js
+        /// const componentsInfo = wx.getOfficialComponentsInfo();
+        /// const { notificationComponentInfo } = componentsInfo;
+        /// if (notificationComponentInfo.isShow) {
+        /// console.log(notificationComponentInfo.boundingClientRect.width);
+        /// console.log(notificationComponentInfo.boundingClientRect.height);
+        /// console.log(notificationComponentInfo.boundingClientRect.top);
+        /// console.log(notificationComponentInfo.boundingClientRect.left);
+        /// console.log(notificationComponentInfo.boundingClientRect.bottom);
+        /// console.log(notificationComponentInfo.boundingClientRect.right);
+        /// }
+        /// ```
+        /// </summary>
+        /// <returns></returns>
+        public static OfficialComponentsInfo GetOfficialComponentsInfo()
+        {
+            return WXSDKManagerHandler.GetOfficialComponentsInfo();
         }
 
         /// <summary>
@@ -3876,10 +4114,10 @@ namespace WeChatWASM
         /// <summary>
         /// [boolean wx.setMessageToFriendQuery(Object object)](https://developers.weixin.qq.com/minigame/dev/api/share/wx.setMessageToFriendQuery.html)
         /// 设置 wx.shareMessageToFriend 接口 query 字段的值
-        /// **提示</title>
+        /// **提示**
         /// 1. 此处的 query 参数与 wx.onShow 取到的启动查询参数 query 不是同一个概念，仅仅是启动查询参数会增加一个字段为 query。
         /// 2. query 参数如涉及 "?"和"&" 等特殊符号，需自行进行 encodeURIComponent 和 decodeURIComponent 等操作。
-        /// <title>示例代码</title>
+        /// **示例代码**
         /// ```js
         /// // 发送方
         /// wx.setMessageToFriendQuery({
@@ -3889,7 +4127,8 @@ namespace WeChatWASM
         /// // 预期接收方可以通过以下方式拿到设置
         /// wx.getEnterOptionsSync().query.shareMessageToFriendScene // 1
         /// wx.getEnterOptionsSync().query.query // 'testquery'
-        /// <title>示例代码-特殊字符query**
+        /// ```
+        /// **示例代码-特殊字符query**
         /// ```js
         /// // 发送方
         /// wx.setMessageToFriendQuery({
